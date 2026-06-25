@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Планировщик бюджета</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #9082d1; /* Исходный фиолетовый фон */
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+        .glass-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .input-plain {
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 100%;
+        }
+        .progress-bar-container {
+            height: 24px;
+            background: #f3f4f6;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        .input-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 10px;
+            transition: all 0.2s;
+        }
+        /* Улучшенная подсветка фокуса для полей ввода в таблице */
+        .input-box:focus-within {
+            border-color: #9082d1;
+            background: #ffffff;
+            box-shadow: 0 0 0 2px rgba(144, 130, 209, 0.2);
+        }
+        .btn-add {
+            color: #ef4444;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid #fee2e2;
+            background-color: #fff5f5;
+            transition: all 0.2s;
+        }
+        .btn-add:hover {
+            background-color: #fee2e2;
+        }
+        .btn-add-savings {
+            color: #10b981;
+            border: 1px solid #d1fae5;
+            background-color: #ecfdf5;
+        }
+        .btn-add-savings:hover {
+            background-color: #d1fae5;
+        }
+        .delete-btn-table {
+            color: #94a3b8;
+            transition: color 0.2s, background-color 0.2s;
+            padding: 4px;
+            border-radius: 6px;
+        }
+        .delete-btn-table:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Стилизация скроллбара для таблиц на мобильных */
+        .table-container {
+            overflow-x: auto;
+        }
+        /* Стили для интерактивных текстовых инпутов */
+        .editable-text-input {
+            border-bottom: 1px dashed #cbd5e1;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .editable-text-input:hover {
+            border-bottom-color: #9082d1;
+            background-color: #f8fafc;
+        }
+        .editable-text-input:focus {
+            border-bottom-style: solid;
+            border-bottom-color: #9082d1;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(144, 130, 209, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="max-w-5xl mx-auto space-y-6">
+    <!-- Шапка приложения -->
+    <div class="glass-card p-8">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <span class="text-2xl">💰</span>
+                    <h1 class="text-2xl font-bold text-gray-800">Планировщик бюджета</h1>
+                </div>
+                <p class="text-sm text-gray-400">Принцип: Расходы + Копилки = 100%</p>
+            </div>
+            <!-- Кнопка сброса к исходным настройкам -->
+            <button onclick="resetToDefaults()" class="text-xs text-purple-600 hover:text-purple-800 font-medium px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">
+                🔄 Сбросить данные
+            </button>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-4">
+            <span class="text-gray-700 font-medium">Общий доход (₽):</span>
+            <input type="number" id="totalIncome" value="100000" class="input-box w-40 text-lg font-bold text-purple-700" oninput="updateIncome(this.value)">
+        </div>
+    </div>
+
+    <!-- Панель со статистикой и прогресс-баром -->
+    <div class="glass-card p-6">
+        <div class="progress-bar-container flex mb-4">
+            <div id="barExpenses" class="bg-red-500 flex items-center justify-center text-white text-xs font-bold transition-all duration-500" style="width: 0%">Расходы: 0%</div>
+            <div id="barSavings" class="bg-emerald-500 flex items-center justify-center text-white text-xs font-bold transition-all duration-500" style="width: 0%">Копилки: 0%</div>
+            <div id="barAvailable" class="bg-slate-300 transition-all duration-500" style="width: 100%"></div>
+        </div>
+        
+        <div class="flex flex-wrap gap-6 text-sm font-medium">
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                <span class="text-gray-600">Расходы:</span>
+                <span id="labelExpenses" class="text-gray-900 font-bold">0 ₽</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                <span class="text-gray-600">Копилки:</span>
+                <span id="labelSavings" class="text-gray-900 font-bold">0 ₽</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                <span class="text-gray-600">Доступно:</span>
+                <span id="labelAvailable" class="text-gray-900 font-bold">0 ₽</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Сетка из двух таблиц -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Таблица обязательных расходов -->
+        <div class="glass-card p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-red-500 text-xl border-l-4 border-red-500 pl-2">❤️</span>
+                    <h2 class="text-lg font-bold text-gray-800">Обязательные расходы</h2>
+                </div>
+                <button onclick="addItem('expenses')" class="btn-add">+ Добавить</button>
+            </div>
+            
+            <div class="table-container flex-grow">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-100 text-xs text-gray-400 uppercase font-semibold">
+                            <th class="py-3 px-2">Категория / Название</th>
+                            <th class="py-3 px-2 w-32">Сумма (₽)</th>
+                            <th class="py-3 px-2 text-center w-16">Доля</th>
+                            <th class="py-3 px-2 text-center w-10"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="expensesTableBody" class="divide-y divide-slate-50">
+                        <!-- Элементы генерируются динамически -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Таблица копилок -->
+        <div class="glass-card p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-emerald-500 text-xl border-l-4 border-emerald-500 pl-2">🏛️</span>
+                    <h2 class="text-lg font-bold text-gray-800">Копилки</h2>
+                </div>
+                <button onclick="addItem('savings')" class="btn-add btn-add-savings">+ Добавить</button>
+            </div>
+
+            <div class="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-sm mb-4">
+                Рассчитываются от остатка: <span id="savingsBase" class="font-bold">0 ₽</span>
+            </div>
+            
+            <div class="table-container flex-grow">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-100 text-xs text-gray-400 uppercase font-semibold">
+                            <th class="py-3 px-2">Куда копим</th>
+                            <th class="py-3 px-2 w-24">Процент</th>
+                            <th class="py-3 px-2 text-right w-28">Сумма</th>
+                            <th class="py-3 px-2 text-center w-10"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="savingsTableBody" class="divide-y divide-slate-50">
+                        <!-- Копилки генерируются динамически -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Исходные (дефолтные) данные
+    const defaultExpenses = [
+        { icon: '🍎', name: 'Еда (за 29 дней)', amount: 25000 },
+        { icon: '🏠', name: 'Ипотека', amount: 35000 },
+        { icon: '🏢', name: 'Коммунальные платежи', amount: 5000 },
+        { icon: '📜', name: 'Страховые взносы ИП', amount: 15000 },
+        { icon: '🐈', name: 'Кот', amount: 4500 },
+        { icon: '📱', name: 'Даня сотовая связь', amount: 660 },
+        { icon: '🙃', name: 'Даня карманные деньги', amount: 1000 },
+        { icon: '🐹', name: 'Шиншилла', amount: 600 },
+        { icon: '👨‍🏫', name: 'Репетитор', amount: 3600 },
+        { icon: '💪', name: 'Протеин', amount: 5600 }
+    ];
+
+    const defaultSavings = [
+        { icon: '👵', name: 'Перевод маме', percent: 5 },
+        { icon: '👩', name: 'Перевод жене', percent: 5 },
+        { icon: '🌴', name: 'Летний отпуск', percent: 4 },
+        { icon: '🏥', name: 'Здоровье', percent: 3 },
+        { icon: '🛡️', name: 'Страховка квартиры', percent: 2 }
+    ];
+
+    const defaultIncome = 100000;
+
+    // Инициализация переменных состояния приложения
+    let expenses = [];
+    let savings = [];
+    let totalIncomeValue = defaultIncome;
+
+    // Загрузка данных из localStorage или использование дефолтных
+    function loadData() {
+        const storedExpenses = localStorage.getItem('budget_expenses');
+        const storedSavings = localStorage.getItem('budget_savings');
+        const storedIncome = localStorage.getItem('budget_income');
+
+        expenses = storedExpenses ? JSON.parse(storedExpenses) : JSON.parse(JSON.stringify(defaultExpenses));
+        savings = storedSavings ? JSON.parse(storedSavings) : JSON.parse(JSON.stringify(defaultSavings));
+        totalIncomeValue = storedIncome ? parseFloat(storedIncome) : defaultIncome;
+
+        document.getElementById('totalIncome').value = totalIncomeValue;
+    }
+
+    // Сохранение текущего состояния в localStorage
+    function saveData() {
+        localStorage.setItem('budget_expenses', JSON.stringify(expenses));
+        localStorage.setItem('budget_savings', JSON.stringify(savings));
+        localStorage.setItem('budget_income', totalIncomeValue.toString());
+    }
+
+    function formatNumber(num) {
+        return Math.round(num).toLocaleString('ru-RU') + ' ₽';
+    }
+
+    // Рендеринг таблицы обязательных расходов
+    function renderExpenses() {
+        const tbody = document.getElementById('expensesTableBody');
+        tbody.innerHTML = '';
+        
+        expenses.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/50 transition-colors';
+            tr.innerHTML = `
+                <td class="py-2.5 px-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg cursor-pointer select-none hover:scale-110 transition-transform" 
+                              onclick="changeIcon('expenses', ${index})" 
+                              title="Нажмите, чтобы изменить иконку">${item.icon}</span>
+                        <input type="text" value="${item.name}" 
+                               class="input-plain editable-text-input text-sm font-medium text-gray-700 bg-transparent" 
+                               placeholder="Название категории"
+                               oninput="updateItemName('expenses', ${index}, this.value)">
+                    </div>
+                </td>
+                <td class="py-2.5 px-2">
+                    <div class="input-box flex items-center gap-1 bg-white">
+                        <span class="text-gray-400 text-xs">₽</span>
+                        <input type="number" value="${item.amount}" 
+                               min="0"
+                               class="input-plain text-sm font-semibold text-gray-800" 
+                               placeholder="0"
+                               oninput="updateItemValue('expenses', ${index}, this.value)">
+                    </div>
+                </td>
+                <td class="py-2.5 px-2 text-center">
+                    <span id="expense-pct-${index}" class="text-[10px] text-purple-600 bg-purple-50 px-2 py-1 rounded font-bold">0%</span>
+                </td>
+                <td class="py-2.5 px-2 text-center">
+                    <button onclick="removeItem('expenses', ${index})" class="delete-btn-table" title="Удалить">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Рендеринг таблицы копилок
+    function renderSavings() {
+        const tbody = document.getElementById('savingsTableBody');
+        tbody.innerHTML = '';
+
+        savings.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/50 transition-colors';
+            tr.innerHTML = `
+                <td class="py-2.5 px-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg cursor-pointer select-none hover:scale-110 transition-transform" 
+                              onclick="changeIcon('savings', ${index})"
+                              title="Нажмите, чтобы изменить иконку">${item.icon}</span>
+                        <input type="text" value="${item.name}" 
+                               class="input-plain editable-text-input text-sm font-medium text-gray-700 bg-transparent" 
+                               placeholder="Цель накопления"
+                               oninput="updateItemName('savings', ${index}, this.value)">
+                    </div>
+                </td>
+                <td class="py-2.5 px-2">
+                    <div class="input-box flex items-center gap-1 bg-white">
+                        <input type="number" value="${item.percent}" 
+                               min="0" max="100"
+                               class="input-plain text-sm font-semibold text-gray-800" 
+                               placeholder="0"
+                               oninput="updateItemValue('savings', ${index}, this.value)">
+                        <span class="text-gray-400 text-xs">%</span>
+                    </div>
+                </td>
+                <td class="py-2.5 px-2 text-right">
+                    <span id="saving-val-${index}" class="text-sm text-emerald-600 font-bold whitespace-nowrap">0 ₽</span>
+                </td>
+                <td class="py-2.5 px-2 text-center">
+                    <button onclick="removeItem('savings', ${index})" class="delete-btn-table" title="Удалить">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Обновление общего дохода
+    function updateIncome(val) {
+        totalIncomeValue = parseFloat(val) || 0;
+        saveData();
+        calculateAll();
+    }
+
+    // Пересчет всех балансов и долей без полной перерисовки DOM
+    function calculateAll() {
+        const income = totalIncomeValue;
+        const totalExp = expenses.reduce((sum, i) => sum + i.amount, 0);
+        const baseForSavings = Math.max(0, income - totalExp);
+        const totalSav = savings.reduce((sum, i) => sum + (baseForSavings * i.percent / 100), 0);
+        const available = Math.max(0, income - totalExp - totalSav);
+
+        // Обновление основных текстовых значений и меток
+        document.getElementById('labelExpenses').innerText = formatNumber(totalExp);
+        document.getElementById('labelSavings').innerText = formatNumber(totalSav);
+        document.getElementById('labelAvailable').innerText = formatNumber(available);
+        document.getElementById('savingsBase').innerText = formatNumber(baseForSavings);
+
+        // Расчет и обновление индикаторов на полосе прогресса
+        const expPct = income > 0 ? (totalExp / income) * 100 : 0;
+        const savPct = income > 0 ? (totalSav / income) * 100 : 0;
+        const availPct = Math.max(0, 100 - expPct - savPct);
+
+        const barExp = document.getElementById('barExpenses');
+        barExp.style.width = expPct + '%';
+        barExp.innerText = expPct > 10 ? `Расходы: ${expPct.toFixed(1)}%` : `${expPct.toFixed(0)}%`;
+        barExp.style.display = expPct > 3 ? 'flex' : 'none';
+
+        const barSav = document.getElementById('barSavings');
+        barSav.style.width = savPct + '%';
+        barSav.innerText = savPct > 10 ? `Копилки: ${savPct.toFixed(1)}%` : `${savPct.toFixed(0)}%`;
+        barSav.style.display = savPct > 3 ? 'flex' : 'none';
+
+        const barAvail = document.getElementById('barAvailable');
+        barAvail.style.width = availPct + '%';
+
+        // Динамическое обновление долей в расходах (колонка таблицы)
+        expenses.forEach((item, index) => {
+            const el = document.getElementById(`expense-pct-${index}`);
+            if (el) {
+                const pct = income > 0 ? ((item.amount / income) * 100).toFixed(1) : 0;
+                el.innerText = `${pct}%`;
+            }
+        });
+
+        // Динамическое обновление сумм в копилках (колонка таблицы)
+        savings.forEach((item, index) => {
+            const el = document.getElementById(`saving-val-${index}`);
+            if (el) {
+                const calculatedAmount = (baseForSavings * item.percent) / 100;
+                el.innerText = formatNumber(calculatedAmount);
+            }
+        });
+    }
+
+    // Быстрое изменение числового значения (сохраняет изменения на лету)
+    function updateItemValue(type, index, value) {
+        const arr = type === 'expenses' ? expenses : savings;
+        const val = parseFloat(value) || 0;
+        if (type === 'expenses') {
+            arr[index].amount = val;
+        } else {
+            arr[index].percent = val;
+        }
+        saveData();
+        calculateAll();
+    }
+
+    // Изменение текстового имени (сохраняет изменения на лету)
+    function updateItemName(type, index, value) {
+        const arr = type === 'expenses' ? expenses : savings;
+        arr[index].name = value;
+        saveData();
+    }
+
+    // Добавление элемента (сохраняет изменения)
+    function addItem(type) {
+        if (type === 'expenses') {
+            expenses.push({ icon: '🆕', name: 'Новый расход', amount: 0 });
+            renderExpenses();
+        } else {
+            savings.push({ icon: '💰', name: 'Новая копилка', percent: 0 });
+            renderSavings();
+        }
+        saveData();
+        calculateAll();
+    }
+
+    // Удаление элемента (сохраняет изменения)
+    function removeItem(type, index) {
+        if (type === 'expenses') {
+            expenses.splice(index, 1);
+            renderExpenses();
+        } else {
+            savings.splice(index, 1);
+            renderSavings();
+        }
+        saveData();
+        calculateAll();
+    }
+
+    // Смена эмодзи/иконки (сохраняет изменения)
+    function changeIcon(type, index) {
+        const icons = ['💰', '🏠', '🍎', '🚗', '📱', '🎮', '💡', '🐾', '🏥', '🎓', '✈️', '🎁', '👵', '👩', '🌴', '🛡️', '🐈', '🐹', '💪', '👨‍🏫'];
+        const currentIcon = type === 'expenses' ? expenses[index].icon : savings[index].icon;
+        let nextIdx = (icons.indexOf(currentIcon) + 1) % icons.length;
+        if (nextIdx === -1) nextIdx = 0;
+        
+        if (type === 'expenses') {
+            expenses[index].icon = icons[nextIdx];
+            renderExpenses();
+        } else {
+            savings[index].icon = icons[nextIdx];
+            renderSavings();
+        }
+        saveData();
+        calculateAll();
+    }
+
+    // Сбросить данные к дефолтным настройкам
+    function resetToDefaults() {
+        localStorage.removeItem('budget_expenses');
+        localStorage.removeItem('budget_savings');
+        localStorage.removeItem('budget_income');
+        
+        loadData();
+        renderExpenses();
+        renderSavings();
+        calculateAll();
+    }
+
+    // Первоначальная загрузка
+    window.onload = function() {
+        loadData();
+        renderExpenses();
+        renderSavings();
+        calculateAll();
+    };
+</script>
+
+</body>
+</html>
